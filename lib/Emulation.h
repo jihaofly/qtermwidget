@@ -157,6 +157,9 @@ public:
    */
   ScreenWindow* createWindow();
 
+  /** Returns the currently active screen (primary or alternate) — t171: OSC 8 / test access */
+  Screen* screen() const { return _currentScreen; }
+
   /** Returns the size of the screen image which the emulation produces */
   QSize imageSize() const;
 

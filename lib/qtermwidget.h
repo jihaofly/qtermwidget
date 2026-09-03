@@ -122,6 +122,9 @@ public:
     // Wrapped, scroll to end.
     void scrollToEnd();
 
+    // t153: mouseMarks=true -> 鼠标拖选/双击建立选区（标准终端；false=点击发终端）
+    void setMouseMarks(bool on);
+
     // Send some text to terminal
     void sendText(const QString & text);
 
@@ -261,6 +264,9 @@ signals:
     void receivedData(const QString &text);
 
 public slots:
+    // t130: remote output injection (teletype mode) - equivalent to PTY output path
+    void injectOutput(const char *data, int len);
+
     // Copy selection to clipboard
     void copyClipboard();
 

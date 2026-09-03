@@ -40,6 +40,7 @@
 //#include <KRun>
 
 // Konsole
+#include "Character.h"
 #include "TerminalCharacterDecoder.h"
 #include "konsole_wcwidth.h"
 
@@ -132,13 +133,23 @@ TerminalImageFilterChain::~TerminalImageFilterChain()
     delete _linePositions;
 }
 
-void TerminalImageFilterChain::setImage(const Character* const image , int lines , int columns, const QVector<LineProperty>& lineProperties)
+void TerminalImageFilterChain::setImage(const Character* const image , int lines , int columns, const QVector<LineProperty>& lineProperties,
+                                        const QHash<quint16, QString>* osc8UriTable)
 {
     if (empty())
         return;
 
     // reset all filters and hotspots
     reset();
+
+    // t171: forward the OSC 8 data to the hyperlink filter in the chain (if present)
+    QListIterator<Filter*> osc8Iter(*this);
+    while (osc8Iter.hasNext())
+    {
+        Osc8Filter* osc8Filter = qobject_cast<Osc8Filter*>(osc8Iter.next());
+        if (osc8Filter)
+            osc8Filter->setOsc8Image(image, lines, columns, osc8UriTable);
+    }
 
     PlainTextDecoder decoder;
     decoder.setTrailingWhitespace(false);
@@ -492,6 +503,56 @@ void FilterObject::emitActivated(const QUrl& url, bool fromContextMenu)
 void FilterObject::activate()
 {
     _filter->activate(sender()->objectName());
+}
+
+// t171: OSC 8 hyperlink filter -------------------------------------------
+
+Osc8Filter::HotSpot::HotSpot(int startLine,int startColumn,int endLine,int endColumn,const QString& uri)
+: UrlFilter::HotSpot(startLine,startColumn,endLine,endColumn)
+{
+    // reuse UrlFilter::HotSpot's open / copy link actions with the OSC 8 URI as the link target
+    setCapturedTexts(QStringList() << uri);
+}
+
+void Osc8Filter::setOsc8Image(const Character* image , int lines , int columns,
+                              const QHash<quint16, QString>* uriTable)
+{
+    _image = image;
+    _lines = lines;
+    _columns = columns;
+    _uriTable = uriTable;
+}
+
+void Osc8Filter::process()
+{
+    if ( !_image || !_uriTable )
+        return;
+
+    for (int line = 0 ; line < _lines ; line++)
+    {
+        const Character* lineChars = _image + line * _columns;
+        int col = 0;
+        while ( col < _columns )
+        {
+            const quint16 id = lineChars[col].osc8Id;
+            if ( id == 0 )
+            {
+                col++;
+                continue;
+            }
+            const int startColumn = col;
+            while ( col < _columns && lineChars[col].osc8Id == id )
+                col++;
+
+            const QString uri = _uriTable->value(id);
+            if ( uri.isEmpty() )
+                continue; // stale id (table was reset) - degrade to plain text
+
+            Osc8Filter::HotSpot* spot = new Osc8Filter::HotSpot(line , startColumn , line , col - 1 , uri);
+            connect(spot->getUrlObject() , &FilterObject::activated , this , &Osc8Filter::activated);
+            addHotSpot(spot);
+        }
+    }
 }
 
 FilterObject* UrlFilter::HotSpot::getUrlObject() const

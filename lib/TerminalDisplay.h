@@ -431,6 +431,8 @@ public slots:
     void updateLineProperties();
 
     /** Copies the selected text to the clipboard. */
+    // t153: mouseMarks=true -> 鼠标拖选/双击建立选区（标准终端；false=点击发终端）
+    void setMouseMarks(bool on) { _mouseMarks = on; }
     void copyClipboard();
     /**
      * Pastes the content of the clipboard into the

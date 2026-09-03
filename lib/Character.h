@@ -98,6 +98,12 @@ public:
   CharacterColor  backgroundColor;
 
   /**
+   * OSC 8 hyperlink id (ITU T.416), 0 = no link.
+   * The URI itself is kept in Screen's uri table, characters only carry the id.
+   */
+  quint16 osc8Id = 0;
+
+  /**
    * Returns true if this character has a transparent background when
    * it is drawn with the specified @p palette.
    */
@@ -131,7 +137,8 @@ inline bool operator == (const Character& a, const Character& b)
   return a.character == b.character &&
          a.rendition == b.rendition &&
          a.foregroundColor == b.foregroundColor &&
-         a.backgroundColor == b.backgroundColor;
+         a.backgroundColor == b.backgroundColor &&
+         a.osc8Id == b.osc8Id;
 }
 
 inline bool operator != (const Character& a, const Character& b)
@@ -139,7 +146,8 @@ inline bool operator != (const Character& a, const Character& b)
   return    a.character != b.character ||
             a.rendition != b.rendition ||
             a.foregroundColor != b.foregroundColor ||
-            a.backgroundColor != b.backgroundColor;
+            a.backgroundColor != b.backgroundColor ||
+            a.osc8Id != b.osc8Id;
 }
 
 inline bool Character::isTransparent(const ColorEntry* base) const

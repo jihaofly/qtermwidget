@@ -60,6 +60,7 @@
 //#include <config-apps.h>
 #include "Filter.h"
 #include "konsole_wcwidth.h"
+#include "Screen.h"
 #include "ScreenWindow.h"
 #include "TerminalCharacterDecoder.h"
 
@@ -411,7 +412,8 @@ TerminalDisplay::TerminalDisplay(QWidget *parent)
   setFocusPolicy( Qt::WheelFocus );
 
   // enable input method support
-  setAttribute(Qt::WA_InputMethodEnabled, true);
+  // t130: disable IME - terminal keys must pass through (ibus pinyin was composing 'seq ' -> CJK)
+  setAttribute(Qt::WA_InputMethodEnabled, false);
 
   // this is an important optimization, it tells Qt
   // that TerminalDisplay will handle repainting its entire area.
@@ -1071,7 +1073,8 @@ void TerminalDisplay::processFilters()
     _filterChain->setImage( _screenWindow->getImage(),
                             _screenWindow->windowLines(),
                             _screenWindow->windowColumns(),
-                            _screenWindow->getLineProperties() );
+                            _screenWindow->getLineProperties(),
+                            &_screenWindow->screen()->osc8UriTable() ); // t171: OSC 8 links
     _filterChain->process();
 
     QRegion postUpdateHotSpots = hotSpotRegion();
@@ -1531,6 +1534,10 @@ void TerminalDisplay::paintFilters(QPainter& painter)
                 // find the position of the underline below that
                 int underlinePos = baseline + metrics.underlinePos();
                 if ( region.contains( mapFromGlobal(QCursor::pos()) ) ){
+                    // t171: draw in the scheme's foreground colour — the default (black)
+                    // pen is invisible on dark colour schemes, which made hover underlines
+                    // of all link hotspots (URL regex and OSC 8 alike) effectively invisible
+                    painter.setPen( _colorTable[DEFAULT_FORE_COLOR].color );
                     painter.drawLine( r.left() , underlinePos ,
                                       r.right() , underlinePos );
                 }
@@ -2017,6 +2024,9 @@ void TerminalDisplay::mouseMoveEvent(QMouseEvent* ev)
         _mouseOverHotspotArea |= r;
     }
 
+    // t171: point at clickable links (OSC 8 and URL hotspots alike)
+    setCursor( Qt::PointingHandCursor );
+
     update( _mouseOverHotspotArea | previousHotspotArea );
   }
   else if ( !_mouseOverHotspotArea.isEmpty() )
@@ -2024,6 +2034,8 @@ void TerminalDisplay::mouseMoveEvent(QMouseEvent* ev)
         update( _mouseOverHotspotArea );
         // set hotspot area to an invalid rectangle
         _mouseOverHotspotArea = QRegion();
+        // t171: restore the regular cursor when leaving a link
+        setCursor( _mouseMarks ? Qt::IBeamCursor : Qt::ArrowCursor );
   }
 
   // for auto-hiding the cursor, we need mouseTracking

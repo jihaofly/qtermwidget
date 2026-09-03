@@ -22,6 +22,7 @@
 
 // Own
 #include "Screen.h"
+#include <QDebug>
 
 // Standard
 #include <stdio.h>
@@ -644,6 +645,34 @@ void Screen::checkSelection(int from, int to)
         clearSelection();
 }
 
+// OSC 8 (ITU T.416): apply @p uri to characters written afterwards; empty ends the link.
+// Same URI reuses the same id so wrapped / repeated occurrences share one table entry.
+// Table is capped to keep memory bounded; stale ids on screen degrade to plain text.
+void Screen::setCurrentOsc8Uri(const QString& uri)
+{
+    if (uri.isEmpty())
+    {
+        _osc8CurrentId = 0;
+        return;
+    }
+
+    quint16 id = _osc8UriTable.key(uri, 0);
+    if (id == 0)
+    {
+        // cap the table; ids are NOT renumbered so old on-screen ids stay
+        // dangling (degrade to plain text) instead of colliding with new ones
+        if (_osc8UriTable.size() >= 1024) // ponytail: fixed cap, raise if real usage demands
+        {
+            _osc8UriTable.clear();
+        }
+        id = _osc8NextId++;
+        if (_osc8NextId == 0) // quint16 wrap: skip the reserved id 0 (no link)
+            _osc8NextId = 1;
+        _osc8UriTable.insert(id, uri);
+    }
+    _osc8CurrentId = id;
+}
+
 void Screen::displayCharacter(wchar_t c)
 {
     // Note that VT100 does wrapping BEFORE putting the character.
@@ -684,6 +713,7 @@ void Screen::displayCharacter(wchar_t c)
     currentChar.foregroundColor = effectiveForeground;
     currentChar.backgroundColor = effectiveBackground;
     currentChar.rendition = effectiveRendition;
+    currentChar.osc8Id = _osc8CurrentId;
 
     lastDrawnChar = c;
 
@@ -701,6 +731,7 @@ void Screen::displayCharacter(wchar_t c)
         ch.foregroundColor = effectiveForeground;
         ch.backgroundColor = effectiveBackground;
         ch.rendition = effectiveRendition;
+        ch.osc8Id = _osc8CurrentId;
 
         w--;
     }

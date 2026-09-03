@@ -24,6 +24,7 @@
 #define SCREEN_H
 
 // Qt
+#include <QHash>
 #include <QRect>
 #include <QTextStream>
 #include <QVarLengthArray>
@@ -348,6 +349,14 @@ public:
      */
     void displayCharacter(wchar_t c);
 
+    /**
+     * OSC 8 hyperlink (ITU T.416): sets the URI which applies to characters
+     * written afterwards. An empty @p uri ends the current link.
+     */
+    void setCurrentOsc8Uri(const QString& uri);
+    /** OSC 8 link id -> URI table (read by Osc8Filter to resolve hotspots) */
+    const QHash<quint16, QString>& osc8UriTable() const { return _osc8UriTable; }
+
     // Do composition with last shown character FIXME: Not implemented yet for KDE 4
     void compose(const QString& compose);
 
@@ -654,6 +663,11 @@ private:
     CharacterColor effectiveForeground; // These are derived from
     CharacterColor effectiveBackground; // the cu_* variables above
     quint8 effectiveRendition;          // to speed up operation
+
+    // OSC 8 hyperlink state ----------------------
+    quint16 _osc8CurrentId = 0;                        // link applied to chars written now (0 = none)
+    quint16 _osc8NextId = 1;                           // next id to hand out
+    QHash<quint16, QString> _osc8UriTable;             // link id -> URI
 
     class SavedState
     {

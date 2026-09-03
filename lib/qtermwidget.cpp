@@ -238,6 +238,16 @@ void QTermWidget::startShellProgram()
     m_impl->m_session->run();
 }
 
+void QTermWidget::injectOutput(const char *data, int len)
+{
+    m_impl->m_session->emulation()->receiveData(data, len);
+}
+
+void QTermWidget::setMouseMarks(bool on)
+{
+    m_impl->m_terminalDisplay->setMouseMarks(on);
+}
+
 void QTermWidget::startTerminalTeletype()
 {
     if ( m_impl->m_session->isRunning() ) {
@@ -289,6 +299,11 @@ void QTermWidget::init(int startnow)
     connect(m_impl->m_session, &Session::receivedData, this, &QTermWidget::receivedData);
 
     // That's OK, FilterChain's dtor takes care of UrlFilter.
+    // t171: OSC 8 filter goes first so explicitly-declared links win the
+    // hotSpotAt() lookup when they overlap regex-detected URLs.
+    Osc8Filter *osc8Filter = new Osc8Filter();
+    connect(osc8Filter, &Osc8Filter::activated, this, &QTermWidget::urlActivated);
+    m_impl->m_terminalDisplay->filterChain()->addFilter(osc8Filter);
     UrlFilter *urlFilter = new UrlFilter();
     connect(urlFilter, &UrlFilter::activated, this, &QTermWidget::urlActivated);
     m_impl->m_terminalDisplay->filterChain()->addFilter(urlFilter);

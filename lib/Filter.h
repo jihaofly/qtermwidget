@@ -28,7 +28,11 @@
 #include <QHash>
 #include <QRegExp>
 
-// Local
+// Qt
+#include <QHash>
+
+// Konsole
+#include "Character.h"
 
 namespace Konsole
 {
@@ -308,6 +312,40 @@ signals:
 };
 
 /**
+ * A filter which creates link hotspots for OSC 8 hyperlinks (ITU T.416).
+ *
+ * OSC 8 carries the URI out-of-band: characters on screen only hold a numeric
+ * link id (Character::osc8Id) and the id -> URI mapping lives in Screen.
+ * Runs of equal id within one line become one Link hotspot; open / copy actions
+ * are reused from UrlFilter::HotSpot.
+ */
+class Osc8Filter : public Filter
+{
+    Q_OBJECT
+public:
+    class HotSpot : public UrlFilter::HotSpot
+    {
+    public:
+        HotSpot(int startLine,int startColumn,int endLine,int endColumn,const QString& uri);
+    };
+
+    /** Sets the terminal image and the Screen's id -> URI table to scan */
+    void setOsc8Image(const Character* image , int lines , int columns,
+                      const QHash<quint16, QString>* uriTable);
+
+    virtual void process();
+
+signals:
+    void activated(const QUrl& url, bool fromContextMenu);
+
+private:
+    const Character* _image = nullptr;
+    int _lines = 0;
+    int _columns = 0;
+    const QHash<quint16, QString>* _uriTable = nullptr;
+};
+
+/**
  * A chain which allows a group of filters to be processed as one.
  * The chain owns the filters added to it and deletes them when the chain itself is destroyed.
  *
@@ -371,9 +409,11 @@ public:
      * @param lines The number of lines in the terminal image
      * @param columns The number of columns in the terminal image
      * @param lineProperties The line properties to set for image
+     * @param osc8UriTable The OSC 8 link id -> URI table of the associated Screen (may be null)
      */
     void setImage(const Character* const image , int lines , int columns,
-                  const QVector<LineProperty>& lineProperties);
+                  const QVector<LineProperty>& lineProperties,
+                  const QHash<quint16, QString>* osc8UriTable = nullptr);
 
 private:
     QString* _buffer;

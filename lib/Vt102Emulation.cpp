@@ -22,6 +22,7 @@
 
 // Own
 #include "Vt102Emulation.h"
+#include <QDebug>
 
 // XKB
 //#include <config-konsole.h>
@@ -396,6 +397,30 @@ void Vt102Emulation::receiveChar(wchar_t cc)
 }
 void Vt102Emulation::processWindowAttributeChange()
 {
+  // t171: OSC 8 hyperlink (ITU T.416): "8 ; params ; URI" — an empty URI ends the link.
+  // tokenBuffer[0]==ESC and tokenBuffer[1]==']' by construction (only OSC end calls this).
+  // Both terminators leave exactly one residue char in the buffer: ST (ESC \) its '\',
+  // BEL its 0x07 (BEL is excluded from the CTL branch by ces()'s !Xte, so it lands here).
+  if (tokenBufferPos >= 4 && tokenBuffer[2] == '8' && tokenBuffer[3] == ';')
+  {
+    int sep = 4;
+    while (sep < tokenBufferPos && tokenBuffer[sep] != ';')
+      sep++; // skip params (ignored; the "id=" param is not supported)
+    if (sep >= tokenBufferPos)
+    {
+      reportDecodingError();
+      return;
+    }
+    const wchar_t last = tokenBuffer[tokenBufferPos-1];
+    const int tail = (last == '\\' || last == 0x07) ? 1 : 0;
+    QString uri;
+    uri.reserve(qMax(0, tokenBufferPos - sep - 1 - tail)); // ponytail: URIs capped by MAX_TOKEN_LENGTH (256)
+    for (int j = sep + 1; j < tokenBufferPos - tail; j++)
+      uri.append(QChar(tokenBuffer[j]));
+    _currentScreen->setCurrentOsc8Uri(uri);
+    return;
+  }
+
   // Describes the window or terminal session attribute to change
   // See Session::UserTitleChange for possible values
   int attributeToChange = 0;
