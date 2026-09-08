@@ -104,6 +104,8 @@ set(HDRS_DISTRIB
     lib/qtermwidget.h
     lib/Emulation.h
     lib/Filter.h
+    lib/Character.h
+    lib/CharacterColor.h
 )
 
 # dirs
